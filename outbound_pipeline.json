@@ -1,0 +1,2013 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "96b00459-8777-4cfd-85fa-867a74ba3ce5",
+      "name": "Schedule Trigger (9AM Weekdays)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -4448,
+        1168
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "outbound-manual-trigger",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "fa788dc1-723b-4fff-8eba-93a69756d56e",
+      "name": "Manual Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -4448,
+        1360
+      ],
+      "webhookId": "outbound-manual-trigger"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appjbZj8witJSPRcq",
+          "mode": "list",
+          "cachedResultName": "OutBound Demo Base",
+          "cachedResultUrl": "https://airtable.com/appjbZj8witJSPRcq"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl992beULmCgxmQI",
+          "mode": "list",
+          "cachedResultName": "Prospects",
+          "cachedResultUrl": "https://airtable.com/appjbZj8witJSPRcq/tbl992beULmCgxmQI"
+        },
+        "filterByFormula": "AND({Enrichment Status} = 'Pending', OR({Last Processed} = '', IS_BEFORE({Last Processed}, DATEADD(TODAY(), -1, 'days'))))",
+        "options": {
+          "fields": [
+            "Company Name",
+            "Industry",
+            "Employee Count",
+            "Annual Revenue",
+            "Contact Name",
+            "Contact Title",
+            "Email",
+            "Date Added",
+            "Last Processed",
+            "Enrichment Status"
+          ]
+        }
+      },
+      "id": "20fa2f21-9dc0-4be1-82a9-32f133d4933e",
+      "name": "Fetch Unprocessed Prospects",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        -4192,
+        1184
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "irC7jqR0vC5nxbQf",
+          "name": "Outbound Demo PAT"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BEQJ79N2U",
+          "mode": "id"
+        },
+        "text": "=🔴 *[ERROR] Outbound Pipeline — Airtable Fetch Failed*\n\nFailed to fetch prospects from Airtable. Pipeline has stopped.\n\n*Error:* {{ $json.error.message }}\n*Time:* {{ new Date().toISOString() }}\n\nCheck Airtable credentials and base ID before next scheduled run.",
+        "otherOptions": {
+          "mrkdwn": true
+        }
+      },
+      "id": "494184ab-e6ca-4e15-93c3-0d41b4cda7af",
+      "name": "Slack — Fetch Error Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        -4144,
+        1648
+      ],
+      "webhookId": "e1e2228f-8267-4642-a1b1-c8ea2c77a4ca",
+      "credentials": {
+        "slackApi": {
+          "id": "9MCtGFMrb7DCH2zK",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "check-records-exist",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c0962afa-486b-456d-8d32-ea7500f11ced",
+      "name": "Records Exist?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -4032,
+        1168
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BEQJ79N2U",
+          "mode": "id"
+        },
+        "text": "ℹ️ *Outbound Pipeline — No Prospects to Process*\n\nAll records are either processed or not yet due. Pipeline exited cleanly.\n\n_Run time: {{ new Date().toISOString() }}_",
+        "otherOptions": {
+          "mrkdwn": true
+        }
+      },
+      "id": "c369ca90-9c13-40df-8124-44417d18e9ae",
+      "name": "Slack — No Records Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        -3984,
+        1520
+      ],
+      "webhookId": "a42f12e6-e1c3-4dd5-9a1f-7ae163c44c90",
+      "credentials": {
+        "slackApi": {
+          "id": "9MCtGFMrb7DCH2zK",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mock enrichment — simulates Apollo.io response per record\n// Replace this node with real Apollo HTTP Request node in production\n// On failure: flags record for dead letter queue\n\nconst industryProfiles = {\n  'Finance': {\n    techStack: ['SAP', 'Oracle', 'NetSuite'],\n    painPoints: 'High invoice volume, manual AP processes, overbilling risk from vendors',\n    buyerContext: 'Finance teams under pressure to reduce costs and improve accuracy'\n  },\n  'Logistics': {\n    techStack: ['Oracle TMS', 'SAP', 'custom ERP'],\n    painPoints: 'Complex freight invoicing, carrier overbilling, rate card compliance issues',\n    buyerContext: 'Operations teams dealing with thousands of freight invoices monthly'\n  },\n  'Retail': {\n    techStack: ['NetSuite', 'QuickBooks', 'Microsoft Dynamics'],\n    painPoints: 'Thousands of supplier invoices, duplicate payments, vendor disputes',\n    buyerContext: 'AP teams overwhelmed with high volume, error-prone manual matching'\n  },\n  'Healthcare': {\n    techStack: ['Epic', 'Oracle', 'SAP'],\n    painPoints: 'Regulatory compliance on payments, complex billing environments, audit trails',\n    buyerContext: 'Finance teams needing accuracy and compliance in vendor payments'\n  },\n  'Manufacturing': {\n    techStack: ['SAP', 'Oracle', 'Microsoft Dynamics'],\n    painPoints: 'Multi-supplier complexity, PO matching at scale, budget overruns',\n    buyerContext: 'Procurement and finance teams managing large supplier networks'\n  }\n};\n\nconst items = $input.all();\nconst enriched = [];\n\nfor (const item of items) {\n  try {\n    const fields = item.json.fields || item.json;\n    const industry = fields['Industry'] || 'Finance';\n    const profile = industryProfiles[industry] || industryProfiles['Finance'];\n\n    // Validate minimum required fields\n    if (!fields['Company Name'] || !fields['Email']) {\n      throw new Error(`Missing required fields: Company Name or Email`);\n    }\n\n    enriched.push({\n      json: {\n        record_id: item.json.id,\n        company_name: fields['Company Name'],\n        industry: industry,\n        employee_count: fields['Employee Count'] || 0,\n        annual_revenue: fields['Annual Revenue'] || 'Unknown',\n        contact_name: fields['Contact Name'] || 'Unknown',\n        contact_title: fields['Contact Title'] || 'Unknown',\n        email: fields['Email'],\n        date_added: fields['Date Added'],\n        enriched_tech_stack: profile.techStack.join(', '),\n        enriched_pain_points: profile.painPoints,\n        enriched_buyer_context: profile.buyerContext,\n        enrichment_source: 'Mock-Apollo',\n        enrichment_status: 'Success'\n      }\n    });\n  } catch (err) {\n    // Flag failed records — routed to dead letter queue downstream\n    enriched.push({\n      json: {\n        record_id: item.json.id || 'unknown',\n        company_name: (item.json.fields || item.json)['Company Name'] || 'Unknown',\n        enrichment_status: 'failed',\n        failed_at: 'Enrichment',\n        error_message: err.message,\n        processed_at: new Date().toISOString()\n      }\n    });\n  }\n}\n\nreturn enriched;"
+      },
+      "id": "fee17aa6-2764-4bd4-9135-dbf9c5c9996d",
+      "name": "Mock Apollo Enrichment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3680,
+        1168
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "check-enrichment-success",
+              "leftValue": "={{ $json.enrichment_status }}",
+              "rightValue": "Success",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5d307851-6637-4e36-be92-6ea93e6c4cbc",
+      "name": "Enrichment Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -3440,
+        1168
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appjbZj8witJSPRcq",
+          "mode": "list",
+          "cachedResultName": "OutBound Demo Base",
+          "cachedResultUrl": "https://airtable.com/appjbZj8witJSPRcq"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblrMO2SSKxjmTv92",
+          "mode": "list",
+          "cachedResultName": "Pipeline Errors",
+          "cachedResultUrl": "https://airtable.com/appjbZj8witJSPRcq/tblrMO2SSKxjmTv92"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Record ID",
+              "displayName": "Record ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Failed At",
+              "displayName": "Failed At",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Enrichment",
+                  "value": "Enrichment"
+                },
+                {
+                  "name": "AI Draft",
+                  "value": "AI Draft"
+                },
+                {
+                  "name": "Queue Write",
+                  "value": "Queue Write"
+                },
+                {
+                  "name": "Watermark",
+                  "value": "Watermark"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Error Message",
+              "displayName": "Error Message",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Prospect",
+              "displayName": "Prospect",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Outbound Queue Record",
+              "displayName": "Outbound Queue Record",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "aefa5fe2-a229-447f-bd09-d8666348c0a8",
+      "name": "Log Enrichment Error",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        -3440,
+        1568
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "irC7jqR0vC5nxbQf",
+          "name": "Outbound Demo PAT"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Deterministic fit scoring for OpenEnvoy ICP\nconst items = $input.all();\nconst scored = [];\n\nfor (const item of items) {\n  const data = item.json;\n  let score = 0;\n  const reasons = [];\n\n  // Employee count\n  const employees = data.employee_count || 0;\n  if (employees >= 500) {\n    score += 3;\n    reasons.push('Enterprise size (500+ employees) — high invoice volume likely');\n  } else if (employees >= 100) {\n    score += 2;\n    reasons.push('Mid-market size (100-499 employees) — good fit range');\n  } else if (employees >= 50) {\n    score += 1;\n    reasons.push('SMB (50-99 employees) — marginal fit');\n  } else {\n    reasons.push('Too small (<50 employees) — low invoice volume expected');\n  }\n\n  // Industry\n  const highFit = ['Logistics', 'Manufacturing', 'Retail', 'Healthcare'];\n  const medFit = ['Finance', 'Construction', 'Energy'];\n  if (highFit.includes(data.industry)) {\n    score += 3;\n    reasons.push(`${data.industry} — high invoice volume industry, strong OpenEnvoy fit`);\n  } else if (medFit.includes(data.industry)) {\n    score += 2;\n    reasons.push(`${data.industry} — moderate invoice complexity, good fit`);\n  } else {\n    score += 1;\n    reasons.push(`${data.industry} — industry fit unclear, needs qualification`);\n  }\n\n  // Revenue\n  const revenue = data.annual_revenue || '';\n  if (revenue.includes('$100M') || revenue.includes('$500M') || revenue.includes('$1B')) {\n    score += 3;\n    reasons.push('Large revenue — significant AP spend, ROI case strong');\n  } else if (revenue.includes('$10M') || revenue.includes('$50M')) {\n    score += 2;\n    reasons.push('Mid-range revenue — viable AP automation candidate');\n  } else {\n    score += 1;\n    reasons.push('Revenue unknown or low — ROI case needs validation');\n  }\n\n  // Contact title\n  const title = (data.contact_title || '').toLowerCase();\n  if (title.includes('cfo') || title.includes('chief financial') || title.includes('vp finance')) {\n    score += 1;\n    reasons.push('Economic buyer contact (CFO/VP Finance) — decision maker access');\n  } else if (title.includes('ap manager') || title.includes('accounts payable') || title.includes('controller')) {\n    score += 1;\n    reasons.push('AP practitioner contact — end user, champion potential');\n  }\n\n  const tier = score >= 8 ? 'High' : score >= 5 ? 'Medium' : 'Low';\n\n  scored.push({\n    json: {\n      ...data,\n      fit_score: score,\n      fit_tier: tier,\n      scoring_reasons: reasons.join(' | ')\n    }\n  });\n}\n\nreturn scored;"
+      },
+      "id": "327982ae-9c6f-4ed1-aca7-955df5498f92",
+      "name": "Deterministic Fit Scoring",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3200,
+        1152
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-fit-tier",
+              "leftValue": "={{ $json.fit_tier }}",
+              "rightValue": "Low",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "fc2ab75d-0c34-4dcc-a18b-9a2f5ed10fef",
+      "name": "Filter Low Fit",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -3024,
+        1152
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Parse Claude HTTP API response — with full error handling\n// Mode: runOnceForAllItems — n8n passes all items at once\n\nconst item = $input.item;\nconst claudeText = item.json?.content?.[0]?.text || '';\nconst prospectData = $('Filter Low Fit').item.json;\n\nif (!claudeText || claudeText.trim() === '') {\n  throw new Error('Claude returned empty response');\n}\n\nlet emailDraft;\ntry {\n  const cleaned = claudeText.replace(/```json|```/g, '').trim();\n  emailDraft = JSON.parse(cleaned);\n} catch (parseErr) {\n  const match = claudeText.match(/\\{[\\s\\S]*\\}/);\n  if (match) {\n    emailDraft = JSON.parse(match[0]);\n  } else {\n    emailDraft = {\n      subject: '[AUTO-PARSE FAILED — Review Required]',\n      body: claudeText,\n      personalization_hook: 'JSON parse failed — raw Claude output saved'\n    };\n  }\n}\n\nif (!emailDraft.subject || !emailDraft.body) {\n  throw new Error('Claude response missing required fields: subject or body');\n}\n\nreturn {\n  json: {\n    ...prospectData,\n    email_subject: emailDraft.subject,\n    email_body: emailDraft.body,\n    personalization_hook: emailDraft.personalization_hook || 'N/A',\n    ai_draft_status: 'success',\n    processed_at: new Date().toISOString()\n  }\n};"
+      },
+      "id": "33515bd9-3820-4cfe-8b3b-e33ddd8ca7c2",
+      "name": "Parse Claude Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2560,
+        1136
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "check-ai-status",
+              "leftValue": "={{ $json.ai_draft_status }}",
+              "rightValue": "success",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "700fae63-810b-4d65-a3e5-e4c650bd3555",
+      "name": "AI Draft Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -2400,
+        1136
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appjbZj8witJSPRcq",
+          "mode": "list",
+          "cachedResultName": "OutBound Demo Base",
+          "cachedResultUrl": "https://airtable.com/appjbZj8witJSPRcq"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblI3SD4X2sBGhowZ",
+          "mode": "list",
+          "cachedResultName": "Outbound Queue",
+          "cachedResultUrl": "https://airtable.com/appjbZj8witJSPRcq/tblI3SD4X2sBGhowZ"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Company Name": "={{ $json.company_name }}",
+            "Contact Name": "={{ $json.contact_name }}",
+            "Contact Title": "={{ $json.contact_title }}",
+            "Email": "={{ $json.email }}",
+            "Fit Score": "={{ $json.fit_score }}",
+            "Fit Tier": "={{ $json.fit_tier }}",
+            "Fit Reasoning": "={{ $json.scoring_reasons }}",
+            "Email Subject": "={{ $json.email_subject }}",
+            "Email Draft": "={{ $json.email_body }}",
+            "Personalization Hook": "={{ $json.personalization_hook }}",
+            "Status": "Draft - Pending Review",
+            "Processed At": "={{ $json.processed_at }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Contact Name",
+              "displayName": "Contact Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Contact Title",
+              "displayName": "Contact Title",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Fit Score",
+              "displayName": "Fit Score",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Fit Tier",
+              "displayName": "Fit Tier",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "High",
+                  "value": "High"
+                },
+                {
+                  "name": "Medium",
+                  "value": "Medium"
+                },
+                {
+                  "name": "Low",
+                  "value": "Low"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Fit Reasoning",
+              "displayName": "Fit Reasoning",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email Subject",
+              "displayName": "Email Subject",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email Draft",
+              "displayName": "Email Draft",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Personalization Hook",
+              "displayName": "Personalization Hook",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Draft - Pending Review",
+                  "value": "Draft - Pending Review"
+                },
+                {
+                  "name": "Low Fit - Skipped",
+                  "value": "Low Fit - Skipped"
+                },
+                {
+                  "name": "AI Draft Failed",
+                  "value": "AI Draft Failed"
+                },
+                {
+                  "name": "Enrichment Failed",
+                  "value": "Enrichment Failed"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Processed At",
+              "displayName": "Processed At",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Prospect",
+              "displayName": "Prospect",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Pipeline Errors",
+              "displayName": "Pipeline Errors",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "acb01ac0-913c-410b-9a7b-a2c1bd34e861",
+      "name": "Save to Outbound Queue",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        -2032,
+        960
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "irC7jqR0vC5nxbQf",
+          "name": "Outbound Demo PAT"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appjbZj8witJSPRcq",
+          "mode": "list",
+          "cachedResultName": "OutBound Demo Base",
+          "cachedResultUrl": "https://airtable.com/appjbZj8witJSPRcq"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblrMO2SSKxjmTv92",
+          "mode": "list",
+          "cachedResultName": "Pipeline Errors",
+          "cachedResultUrl": "https://airtable.com/appjbZj8witJSPRcq/tblrMO2SSKxjmTv92"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Company Name": "={{ $json.company_name }}",
+            "Record ID": "={{ $json.record_id }}",
+            "Failed At": "AI Draft",
+            "Error Message": "={{ $json.error_message }}",
+            "Timestamp": "={{ $json.processed_at }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "c79bdcd5-75f1-4332-bd1f-911cfa559881",
+      "name": "Log AI Draft Error",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        -2368,
+        1392
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "irC7jqR0vC5nxbQf",
+          "name": "Outbound Demo PAT"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appjbZj8witJSPRcq",
+          "mode": "list",
+          "cachedResultName": "OutBound Demo Base",
+          "cachedResultUrl": "https://airtable.com/appjbZj8witJSPRcq"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl992beULmCgxmQI",
+          "mode": "list",
+          "cachedResultName": "Prospects",
+          "cachedResultUrl": "https://airtable.com/appjbZj8witJSPRcq/tbl992beULmCgxmQI"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('AI Draft Succeeded?').item.json.record_id }}",
+            "Last Processed": "={{ $('AI Draft Succeeded?').item.json.processed_at }}",
+            "Enrichment Status": "={{ $('Enrichment Succeeded?').item.json.enrichment_status }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true
+            },
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Industry",
+              "displayName": "Industry",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Employee Count",
+              "displayName": "Employee Count",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Annual Revenue",
+              "displayName": "Annual Revenue",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Contact Name",
+              "displayName": "Contact Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Contact Title",
+              "displayName": "Contact Title",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Date Added",
+              "displayName": "Date Added",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Last Processed",
+              "displayName": "Last Processed",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Enrichment Status",
+              "displayName": "Enrichment Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Pending",
+                  "value": "Pending"
+                },
+                {
+                  "name": "Success",
+                  "value": "Success"
+                },
+                {
+                  "name": "Failed",
+                  "value": "Failed"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Outbound Queue Records",
+              "displayName": "Outbound Queue Records",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Pipeline Errors",
+              "displayName": "Pipeline Errors",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "10698908-aeab-4c92-99e0-dfa5d5912ff2",
+      "name": "Update Watermark",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        -1824,
+        944
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "irC7jqR0vC5nxbQf",
+          "name": "Outbound Demo PAT"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appjbZj8witJSPRcq",
+          "mode": "list",
+          "cachedResultName": "OutBound Demo Base",
+          "cachedResultUrl": "https://airtable.com/appjbZj8witJSPRcq"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblrMO2SSKxjmTv92",
+          "mode": "list",
+          "cachedResultName": "Pipeline Errors",
+          "cachedResultUrl": "https://airtable.com/appjbZj8witJSPRcq/tblrMO2SSKxjmTv92"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {
+            "Company Name": "={{ $json.company_name }}",
+            "Record ID": "={{ $json.record_id }}",
+            "Failed At": "Queue Write",
+            "Error Message": "Airtable write failed for Outbound Queue",
+            "Timestamp": "={{ new Date().toISOString() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Record ID",
+              "displayName": "Record ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Failed At",
+              "displayName": "Failed At",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Enrichment",
+                  "value": "Enrichment"
+                },
+                {
+                  "name": "AI Draft",
+                  "value": "AI Draft"
+                },
+                {
+                  "name": "Queue Write",
+                  "value": "Queue Write"
+                },
+                {
+                  "name": "Watermark",
+                  "value": "Watermark"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Error Message",
+              "displayName": "Error Message",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Prospect",
+              "displayName": "Prospect",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Outbound Queue Record",
+              "displayName": "Outbound Queue Record",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "794b5f1b-12f5-4fdb-b5d3-222f02c35793",
+      "name": "Log Queue Write Error",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        -1808,
+        1152
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "irC7jqR0vC5nxbQf",
+          "name": "Outbound Demo PAT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appjbZj8witJSPRcq",
+          "mode": "list",
+          "cachedResultName": "OutBound Demo Base",
+          "cachedResultUrl": "https://airtable.com/appjbZj8witJSPRcq"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl992beULmCgxmQI",
+          "mode": "list",
+          "cachedResultName": "Prospects",
+          "cachedResultUrl": "https://airtable.com/appjbZj8witJSPRcq/tbl992beULmCgxmQI"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true
+            },
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Industry",
+              "displayName": "Industry",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Employee Count",
+              "displayName": "Employee Count",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Annual Revenue",
+              "displayName": "Annual Revenue",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Contact Name",
+              "displayName": "Contact Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Contact Title",
+              "displayName": "Contact Title",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Date Added",
+              "displayName": "Date Added",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Last Processed",
+              "displayName": "Last Processed",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Enrichment Status",
+              "displayName": "Enrichment Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Pending",
+                  "value": "Pending"
+                },
+                {
+                  "name": "Enriched",
+                  "value": "Enriched"
+                },
+                {
+                  "name": "Failed",
+                  "value": "Failed"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Outbound Queue Records",
+              "displayName": "Outbound Queue Records",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Pipeline Errors",
+              "displayName": "Pipeline Errors",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "8e072244-19fc-43b6-bdaa-431e2c4f8864",
+      "name": "Update Watermark (Low Fit)",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        -3088,
+        1648
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "irC7jqR0vC5nxbQf",
+          "name": "Outbound Demo PAT"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appjbZj8witJSPRcq",
+          "mode": "list",
+          "cachedResultName": "OutBound Demo Base",
+          "cachedResultUrl": "https://airtable.com/appjbZj8witJSPRcq"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblI3SD4X2sBGhowZ",
+          "mode": "list",
+          "cachedResultName": "Outbound Queue",
+          "cachedResultUrl": "https://airtable.com/appjbZj8witJSPRcq/tblI3SD4X2sBGhowZ"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Fit Score": "={{ $json.fit_score }}",
+            "Company Name": "={{ $json.company_name }}",
+            "Contact Name": "={{ $json.contact_name }}",
+            "Contact Title": "={{ $json.contact_title }}",
+            "Email": "={{ $json.email }}",
+            "Fit Tier": "={{ $json.fit_tier }}",
+            "Fit Reasoning": "={{ $json.scoring_reasons }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Contact Name",
+              "displayName": "Contact Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Contact Title",
+              "displayName": "Contact Title",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Fit Score",
+              "displayName": "Fit Score",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Fit Tier",
+              "displayName": "Fit Tier",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "High",
+                  "value": "High"
+                },
+                {
+                  "name": "Medium",
+                  "value": "Medium"
+                },
+                {
+                  "name": "Low",
+                  "value": "Low"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Fit Reasoning",
+              "displayName": "Fit Reasoning",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email Subject",
+              "displayName": "Email Subject",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email Draft",
+              "displayName": "Email Draft",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Personalization Hook",
+              "displayName": "Personalization Hook",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Draft - Pending Review",
+                  "value": "Draft - Pending Review"
+                },
+                {
+                  "name": "Low Fit - Skipped",
+                  "value": "Low Fit - Skipped"
+                },
+                {
+                  "name": "AI Draft Failed",
+                  "value": "AI Draft Failed"
+                },
+                {
+                  "name": "Enrichment Failed",
+                  "value": "Enrichment Failed"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Processed At",
+              "displayName": "Processed At",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Prospect",
+              "displayName": "Prospect",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Pipeline Errors",
+              "displayName": "Pipeline Errors",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "ef750d3b-6eb1-4fff-b565-fe076eb8cbf2",
+      "name": "Log Low Fit to Queue",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        -3088,
+        1456
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "irC7jqR0vC5nxbQf",
+          "name": "Outbound Demo PAT"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate all items from all paths into a single batch summary\n// Counts by actual Status field written to Outbound Queue\n// This node receives merged output from all branches\n\nconst items = $input.all();\n\nlet drafted = 0;\nlet lowFit = 0;\nlet aiErrors = 0;\nlet enrichmentErrors = 0;\nlet queueWriteErrors = 0;\nlet watermarkErrors = 0;\nlet total = items.length;\n\nfor (const item of items) {\n  const status = item.json.ai_draft_status || '';\n  const failedAt = item.json.failed_at || '';\n  const fitTier = item.json.fit_tier || '';\n  const enrichStatus = item.json.enrichment_status || '';\n\n  if (enrichStatus === 'failed') enrichmentErrors++;\n  else if (fitTier === 'Low') lowFit++;\n  else if (status === 'failed') aiErrors++;\n  else if (status === 'success') drafted++;\n  else queueWriteErrors++;\n}\n\nconst hasErrors = (aiErrors + enrichmentErrors + queueWriteErrors + watermarkErrors) > 0;\n\nreturn [{\n  json: {\n    total,\n    drafted,\n    lowFit,\n    aiErrors,\n    enrichmentErrors,\n    queueWriteErrors,\n    hasErrors,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "dc907b19-59dd-4421-8add-3f3167c2f250",
+      "name": "Build Batch Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1392,
+        1312
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BEQJ79N2U",
+          "mode": "id"
+        },
+        "text": "=🚀 *OpenEnvoy Outbound Pipeline Run Complete*\n\n📊 *Batch Summary*\n• Total Processed: {{ $json.total }}\n• 📝 Drafts Ready for Review: {{ $json.drafted }}\n• 🔴 Low Fit (Skipped): {{ $json.lowFit }}\n{{ $json.hasErrors ? '⚠️ *Errors Detected — Check Pipeline Errors table in Airtable*\\n• AI Draft Failures: ' + $json.aiErrors + '\\n• Enrichment Failures: ' + $json.enrichmentErrors + '\\n• Queue Write Failures: ' + $json.queueWriteErrors : '✅ No errors detected' }}\n\n📋 Review drafts → Airtable Outbound Queue\n_Run completed: {{ $json.timestamp }}_",
+        "otherOptions": {
+          "mrkdwn": true
+        }
+      },
+      "id": "20e32d0b-727b-416d-b6e3-cd8d25506a04",
+      "name": "Slack Batch Summary",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        -1152,
+        1312
+      ],
+      "webhookId": "967ff87d-8dc8-4553-ad6a-156beccbb958",
+      "credentials": {
+        "slackApi": {
+          "id": "9MCtGFMrb7DCH2zK",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"model\": \"claude-haiku-4-5\",\n  \"max_tokens\": 1000,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a senior GTM engineer writing outbound prospecting emails for OpenEnvoy — an AI-native invoice verification platform that catches overbillings before payments go out.\\n\\nProspect Details:\\n- Company: {{ $json.company_name }}\\n- Industry: {{ $json.industry }} \\n- Size: {{ $json.employee_count }} employees\\n- Revenue: {{ $json.annual_revenue }}\\n- Contact: {{ $json.contact_name }}, {{ $json.contact_title }}\\n- Tech Stack (inferred): {{ $json.enriched_tech_stack }}\\n- Pain Points: {{ $json.enriched_pain_points }}\\n- Buyer Context: {{ $json.enriched_buyer_context }}\\n- Fit Score: {{ $json.fit_score }}/10 ({{ $json.fit_tier }} fit)\\n- Scoring Reasoning: {{ $json.scoring_reasons }}\\n\\nWrite a short, personalised cold outbound email. Rules:\\n1. Subject line must be specific to their industry pain point\\n2. Opening line must reference something specific about their company or industry\\n3. One sentence on what OpenEnvoy does — focus on outcome, not features\\n4. One specific pain point relevant to their industry\\n5. Soft CTA — ask for a 15 minute call, not a demo\\n6. Total email body: max 100 words\\n7. Tone: direct, peer-to-peer, no fluff\\n\\nRespond ONLY with a valid JSON object, no markdown, no backticks, no preamble:\\n{\\\"subject\\\": \\\"...\\\", \\\"body\\\": \\\"...\\\", \\\"personalization_hook\\\": \\\"...\\\"}\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "2beb592f-52a2-4747-be43-c115eb8e2589",
+      "name": "Claude Haiku — Draft Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2736,
+        1136
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Z3ZQQX7kZWRuLKah",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -4464,
+        912
+      ],
+      "id": "eb27a84b-a730-49e5-844b-b8fa7780218b",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "content": "## Trigger Nodes. \n\nThree triggers given for flexibility & testing.",
+        "height": 1152,
+        "width": 416,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -4688,
+        672
+      ],
+      "typeVersion": 1,
+      "id": "dc69403d-ff4d-4c7f-a9f6-4053ee5dbf11",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Fetch records from AirTable\n\nThis part is to fetch records from airtable . Any fetch errors will be alerted in slack\n",
+        "height": 1152,
+        "width": 368
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -4224,
+        672
+      ],
+      "id": "06229080-b697-4a1b-8831-4a493ba13c30",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Enrichment of the prospects date\n\nThe fetched data is enriched using Apollo or any data provider just to get more data about them and to be with the latest data. Here a mock enrichment is done since we dont have apollo subscription. Any enrichment error is logged to our pipeline error table. ",
+        "height": 1152,
+        "width": 432,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -3712,
+        672
+      ],
+      "id": "8f0136b2-5ad6-459b-b0ea-dd91b32bfe81",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Fit Scoring of the prospects\nThe enriched data is being evaluated by a rule based system to be given a score for further processing.",
+        "height": 1152,
+        "width": 400,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -3232,
+        672
+      ],
+      "id": "45d4c422-a9f9-469e-893e-cd6e37d7ebc7",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## AI Drafting\n\nClaude AI evaluates the lead, writes an emial, subject, a personalised hook. Any error is caught in tthe error queue.",
+        "height": 560,
+        "width": 512
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2752,
+        992
+      ],
+      "id": "5974f1b7-c4e9-4177-af22-3ff031086b3a",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## Save final draft \n\nFinal draft is saved to the airtable outbound queue and ready for a human to review the draft and send it out.",
+        "height": 848,
+        "width": 624
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2176,
+        704
+      ],
+      "id": "2d6104aa-01bf-45f8-a7b5-6d36ca5bacc9",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## Send Summary\n\nThe summary of the entire batch run is sent to the respective slack channel with a descriptive message.",
+        "height": 496,
+        "width": 384
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1248,
+        1088
+      ],
+      "typeVersion": 1,
+      "id": "62259709-0278-4a73-8e67-499951571c8b",
+      "name": "Sticky Note6"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (9AM Weekdays)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Unprocessed Prospects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Unprocessed Prospects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Unprocessed Prospects": {
+      "main": [
+        [
+          {
+            "node": "Records Exist?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack — Fetch Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Records Exist?": {
+      "main": [
+        [
+          {
+            "node": "Mock Apollo Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack — No Records Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Apollo Enrichment": {
+      "main": [
+        [
+          {
+            "node": "Enrichment Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrichment Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Deterministic Fit Scoring",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Enrichment Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Enrichment Error": {
+      "main": [
+        [
+          {
+            "node": "Build Batch Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deterministic Fit Scoring": {
+      "main": [
+        [
+          {
+            "node": "Filter Low Fit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Low Fit": {
+      "main": [
+        [
+          {
+            "node": "Claude Haiku — Draft Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Low Fit to Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Claude Response": {
+      "main": [
+        [
+          {
+            "node": "AI Draft Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Draft Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Save to Outbound Queue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log AI Draft Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Outbound Queue": {
+      "main": [
+        [
+          {
+            "node": "Update Watermark",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Queue Write Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log AI Draft Error": {
+      "main": [
+        [
+          {
+            "node": "Build Batch Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Watermark": {
+      "main": [
+        [
+          {
+            "node": "Build Batch Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Queue Write Error": {
+      "main": [
+        [
+          {
+            "node": "Build Batch Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Watermark (Low Fit)": {
+      "main": [
+        [
+          {
+            "node": "Build Batch Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Low Fit to Queue": {
+      "main": [
+        [
+          {
+            "node": "Update Watermark (Low Fit)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Batch Summary": {
+      "main": [
+        [
+          {
+            "node": "Slack Batch Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Haiku — Draft Email": {
+      "main": [
+        [
+          {
+            "node": "Parse Claude Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parse Claude Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Fetch Unprocessed Prospects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1b1b01d377b823c9cece2300146447271232089e3efe117bba1da6f4f1a69b02"
+  }
+}
