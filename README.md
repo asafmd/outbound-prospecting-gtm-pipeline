@@ -6,6 +6,9 @@ Built as a working demonstration of GTM automation engineering.
 
 ---
 
+<img width="1822" height="592" alt="image" src="https://github.com/user-attachments/assets/b5003c34-0723-422e-bd9c-e23a7d7c5ffe" />
+
+
 ## What It Does
 
 1. **Fetches unprocessed prospects** from Airtable on a schedule (9AM weekdays) or via manual trigger
